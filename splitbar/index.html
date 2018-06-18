@@ -88,7 +88,7 @@ if (chartwidth < dvc.optional.mobileBreakpoint) {
 		        	var margin = { top: dvc.optional.margin_md[0], right: dvc.optional.margin_md[1], bottom: dvc.optional.margin_md[2], left: dvc.optional.margin_md[3]};
 		            var height = 200 - margin.top - margin.bottom;
 			}
-			
+
 width = chartwidth - margin.left - margin.right;
 
 
@@ -124,45 +124,63 @@ function row(d) {
         ycategory: d.ycategory,
         amount: +d.amount
     };
-	
+
 }
 
 
-	
+
 	console.log(config);
 	d3.csv('data.csv', row, function(error, dataFlat) {
 		if (error) throw error;
-	
+
 		var data = d3.nest()
 			.key(function(d) { return d.xcategory; })
 			.entries(dataFlat)
 			.map(function(d) { return { xcategory: d.key, values: d.values }; });
-		
+
 		yScale.domain(dataFlat.map(y).reverse());
 		columnScale.domain(dataFlat.map(column));
 		xScale.range([0, columnScale.bandwidth()]);
-	
+
 		// Excluding the light colors from the color scheme
 		var colorRange = d3.schemeBuPu[columnScale.domain().length + 2].reverse();
 		colorScale
 			.domain(dataFlat.map(color))
 			.range(colorRange);
-	
+
 		svg.append('g').attr('class', 'axis axis--y')
 			.call(yAxis);
-	
+
 		var gColumn = svg.append('g').attr('class', 'columns')
 				.selectAll('.column').data(data)
 			.enter().append('g')
 				.attr('class', 'column')
 				.attr('transform', function(d) { return 'translate(' + columnValue(d) + ',0)'; });
-	
-		gColumn.append('text').attr('class', 'title')
-			.attr('dy', '-0.34em')
-			.text(column);
-		
+
+    allowedWidth = xScale.range()[1];
+
+		gColumn.append('text')
+    .attr("class","title")
+    .attr('dy', '-0.3em')
+    .text(column)
+    .call(wrap, allowedWidth);
+
+    textheight = [];
+    //height
+console.log(d3.selectAll(".title"));
+    d3.selectAll(".title").each(function(d, i) {
+        bbox = this.getBBox();
+        textheight[i] = bbox.height;
+        console.log(textheight[i]);
+    })
+
+    gColumn.attr('transform', function(d) { return 'translate(' + columnValue(d) + ',' + d3.max(textheight) + ')'; });
+    d3.selectAll(".title").attr('transform','translate(0,' + -d3.max(textheight) + ')')
+    d3.selectAll(".axis--y").attr('transform','translate(0,' + d3.max(textheight) + ')')
+      console.log(d3.max(textheight));
+
 		var bars = gColumn.append('g').attr('class', 'bars');
-	
+
 		bars.selectAll('.bar--underlying').data(function(d) { return d.values; })
 			.enter().append('rect')
 				.attr('class', 'bar bar--underlying')
@@ -170,7 +188,7 @@ function row(d) {
 				.attr('y', function(d) { return yScale(y(d)); })
 				.attr('width', xScale.range()[1])
 				.attr('height', yScale.bandwidth());
-	
+
 		bars.selectAll('.bar--overlying').data(function(d) { return d.values; })
 			.enter().append('rect')
 				.attr('class', 'bar bar--overlying')
@@ -179,7 +197,38 @@ function row(d) {
 				.attr('width', function(d) { return xScale(x(d)); })
 				.attr('height', yScale.bandwidth())
 				.style('fill', colorValue);
-	
+
+
+    function wrap(text, width) {
+        text.each(function(d, i/*[edit]*/) {
+            var text = d3.select(this),
+                words = text.text().split(/\s+/).reverse(),
+                word,
+                line = [],
+                lineNumber = 0,
+                lineHeight = 1.1, // ems
+                y = text.attr("y"),
+                dy = parseFloat(text.attr("dy")),
+                tspan = text.text(null).append("tspan").attr("x", 0).attr("y", y).attr("dy", dy + "em"),
+                //[edit]add dWidth
+                dWidth = typeof width === "function" ? width(d, i) : width;
+            while (word = words.pop()) {
+                line.push(word);
+                tspan.text(line.join(" "));
+                if (tspan.node().getComputedTextLength() > dWidth/*[edit]*/) {
+                    line.pop();
+                    tspan.text(line.join(" "));
+                    line = [word];
+
+                    if(lineHeight <= 1){dyy = ++lineNumber * (lineHeight + dy)} else {dyy = 1 * (lineHeight + dy)}
+
+
+                    tspan = text.append("tspan").attr("x", 0).attr("y", y).attr("dy", dyy + "em").text(word);
+                }
+            }
+        });
+    }
+
 		function positionLabel(d) {
 			var xValue = xScale(x(d));
 			var xMax = xScale.range()[1];
@@ -198,14 +247,14 @@ function row(d) {
 				.attr('y', yScale(y(d)) + (yScale.bandwidth() / 2))
 				.attr('dy', '0.33em');
 		}
-	
+
 		gColumn.append('g').attr('class', 'labels')
 				.selectAll('.label').data(function(d) { return d.values; })
-			.enter().append('text') 
+			.enter().append('text')
 				.attr('class', 'label')
 				.text(function(d) { return formatLabel(x(d)); })
 				.each(positionLabel);
-	
+
 	});
 })
 
